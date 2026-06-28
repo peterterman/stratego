@@ -1,0 +1,98 @@
+Ja, nu er Stratego nået til det punkt, hvor spillet **virker**, men computeren spiller stadig tilfældigt.
+
+Jeg ville udvikle den røde hærs intelligens i disse trin:
+
+### Niveau 1 – Undgå dumme træk
+
+Computeren bør:
+
+* aldrig flytte frem og tilbage mellem de samme to felter
+* foretrække at rykke mod spillerens side
+* undgå at blokere egne brikker
+* vælge et angreb frem for et tomt felt
+
+Dette giver straks et mærkbart bedre spil.
+
+---
+
+### Niveau 2 – Hukommelse
+
+Når en rød brik angriber en blå brik:
+
+* husk hvilken blå rang der blev afsløret
+* husk hvor den blå brik står
+* gem informationen i en AI-hukommelse
+
+Eksempel:
+
+```dart
+class KnownEnemy {
+  final int row;
+  final int col;
+  final String type;
+}
+```
+
+Så ved computeren senere:
+
+> "Der står en Marskal på (7,4)"
+
+---
+
+### Niveau 3 – Sandsynlighedsmodel
+
+For skjulte blå brikker:
+
+* Spejdere flytter langt → sandsynligvis spejder
+* Brikker der aldrig flytter → sandsynligvis bombe eller fane
+* Brikker tæt bag bomber → mulig fane
+
+Så begynder AI'en at lede efter fanen.
+
+---
+
+### Niveau 4 – Værdibaserede angreb
+
+Indfør en score:
+
+| Handling                 | Score  |
+| ------------------------ | ------ |
+| Erobre fane              | +10000 |
+| Slå marskal              | +500   |
+| Slå general              | +300   |
+| Slå anden brik           | +rang  |
+| Tabe egen marskal        | -500   |
+| Gå mod ukendt stærk brik | -50    |
+
+Computeren vælger trækket med højest score.
+
+---
+
+### Niveau 5 – Strategisk plan
+
+Computeren:
+
+* beskytter egen fane
+* bruger spejdere til rekognoscering
+* sender minører mod mistænkte bomber
+* angriber svage områder
+
+Så begynder den faktisk at spille Stratego.
+
+---
+
+## Min anbefaling
+
+Lad os starte med **Niveau 1**.
+
+Det kræver kun ændringer i `computer_logic.dart` og giver stor effekt:
+
+1. Gem sidste træk.
+2. Straf tilbage-tilbage-træk.
+3. Beløn bevægelse mod spilleren.
+4. Prioritér angreb over tomme felter.
+
+Det giver typisk en AI, der føles 5-10 gange mere intelligent uden at gøre koden kompliceret.
+
+Upload gerne `computer_logic.dart`, så kan jeg lave en konkret version af Niveau 1 til dit nuværende Stratego-projekt.
+
