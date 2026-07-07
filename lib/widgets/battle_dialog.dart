@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/game_piece.dart';
 import '../logic/battle_logic.dart';
+import '../services/game_variant_service.dart';
 
 class BattleDialog extends StatefulWidget {
   final GamePiece attacker;
@@ -25,9 +26,13 @@ class _BattleDialogState extends State<BattleDialog>
   late final Animation<Offset> topSlide;
   late final Animation<Offset> bottomSlide;
 
+  GameVariant _variant = GameVariant.eighteenTwelve;
+
   @override
   void initState() {
     super.initState();
+
+    _loadVariant();
 
     controller = AnimationController(
       vsync: this,
@@ -47,6 +52,16 @@ class _BattleDialogState extends State<BattleDialog>
     controller.forward();
   }
 
+  Future<void> _loadVariant() async {
+    final variant = await GameVariantService.getVariant();
+
+    if (!mounted) return;
+
+    setState(() {
+      _variant = variant;
+    });
+  }
+
   @override
   void dispose() {
     controller.dispose();
@@ -54,41 +69,11 @@ class _BattleDialogState extends State<BattleDialog>
   }
 
   String pieceImage(GamePiece piece) {
-    if (piece.isPlayer) {
-      return 'assets/images/blaa_${piece.type}.png';
-    }
-    return 'assets/images/roed_${piece.type}.png';
+    return piece.imageForVariant(_variant, hidden: false);
   }
 
   String pieceName(String type) {
-    switch (type) {
-      case 'marshal':
-        return 'Marskal';
-      case 'general':
-        return 'General';
-      case 'oberst':
-        return 'Oberst';
-      case 'major':
-        return 'Major';
-      case 'kaptajn':
-        return 'Kaptajn';
-      case 'lojtnant':
-        return 'Løjtnant';
-      case 'sergent':
-        return 'Sergent';
-      case 'minor':
-        return 'Minør';
-      case 'spejder':
-        return 'Spejder';
-      case 'spion':
-        return 'Spion';
-      case 'bombe':
-        return 'Bombe';
-      case 'flag':
-        return 'Fane';
-      default:
-        return type;
-    }
+    return GameVariantService.pieceName(type, _variant);
   }
 
   String resultText() {
@@ -97,20 +82,20 @@ class _BattleDialogState extends State<BattleDialog>
     final result = widget.result;
 
     if (result == BattleResult.capturedFlag) {
-      return 'Fanen er erobret';
+      return '${pieceName('flag')} er erobret';
     }
 
     if (defender.type == 'bombe') {
       if (attacker.type == 'minor') {
-        return 'Minør desarmerer Bombe';
+        return '${pieceName('minor')} uskadeliggør ${pieceName('bombe')}';
       }
-      return 'Bombe stopper ${pieceName(attacker.type)}';
+      return '${pieceName('bombe')} stopper ${pieceName(attacker.type)}';
     }
 
     if (attacker.type == 'spion' &&
         defender.type == 'marshal' &&
         result == BattleResult.attackerWins) {
-      return 'Spion dræber Marskal';
+      return '${pieceName('spion')} slår ${pieceName('marshal')}';
     }
 
     if (result == BattleResult.bothDie) {
@@ -146,6 +131,15 @@ class _BattleDialogState extends State<BattleDialog>
               width: 90,
               height: 120,
               fit: BoxFit.fill,
+              errorBuilder: (context, error, stackTrace) {
+                debugPrint('BATTLE IMAGE ERROR: ${pieceImage(topPiece)}');
+                debugPrint('$error');
+                return const SizedBox(
+                  width: 90,
+                  height: 120,
+                  child: Center(child: Text('X')),
+                );
+              },
             ),
           ),
 
@@ -165,6 +159,15 @@ class _BattleDialogState extends State<BattleDialog>
               width: 90,
               height: 120,
               fit: BoxFit.fill,
+              errorBuilder: (context, error, stackTrace) {
+                debugPrint('BATTLE IMAGE ERROR: ${pieceImage(bottomPiece)}');
+                debugPrint('$error');
+                return const SizedBox(
+                  width: 90,
+                  height: 120,
+                  child: Center(child: Text('X')),
+                );
+              },
             ),
           ),
 

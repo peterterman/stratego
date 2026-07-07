@@ -12,20 +12,31 @@ class PlayerService {
     final prefs = await SharedPreferences.getInstance();
 
     var id = prefs.getString(_playerIdKey);
-    if (id == null || id.isEmpty) {
+    if (id == null || id.trim().isEmpty) {
       id = const Uuid().v4();
       await prefs.setString(_playerIdKey, id);
+      debugPrint('NEW LOCAL PLAYER ID: $id');
     }
 
-    return id;
+    return id.trim();
+  }
+
+  static Future<void> setPlayerId(String id) async {
+    final cleanId = id.trim();
+    if (cleanId.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_playerIdKey, cleanId);
+
+    debugPrint('SAVED SERVER PLAYER ID LOCALLY: $cleanId');
   }
 
   static Future<String> getPlayerName() async {
     final prefs = await SharedPreferences.getInstance();
 
     final savedName = prefs.getString(_playerNameKey);
-    if (savedName != null && savedName.isNotEmpty) {
-      return savedName;
+    if (savedName != null && savedName.trim().isNotEmpty) {
+      return savedName.trim();
     }
 
     final id = await getPlayerId();
@@ -34,58 +45,139 @@ class PlayerService {
     final autoName = 'Spiller-$shortId';
     await prefs.setString(_playerNameKey, autoName);
 
+    debugPrint('AUTO PLAYER NAME: $autoName');
+
     return autoName;
   }
 
   static Future<void> setPlayerName(String name) async {
+    final cleanName = name.trim();
+    if (cleanName.isEmpty) return;
+
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_playerNameKey, name.trim());
+    await prefs.setString(_playerNameKey, cleanName);
+
+    debugPrint('SAVED PLAYER NAME LOCALLY: $cleanName');
+
+    await registerOnline();
   }
 
-  static Future<void> registerOnline() async {
+  static Future<Map<String, dynamic>?> registerOnline() async {
     try {
-      final id = await getPlayerId();
+      final localId = await getPlayerId();
       final name = await getPlayerName();
 
-      debugPrint("PLAYER ID   : $id");
-      debugPrint("PLAYER NAME : $name");
+      debugPrint('REGISTER ONLINE');
+      debugPrint('LOCAL PLAYER ID   : $localId');
+      debugPrint('LOCAL PLAYER NAME : $name');
 
       final result = await ServerService.registerPlayer(
-        playerId: id,
+        playerId: localId,
         playerName: name,
       );
 
-      debugPrint("SERVER RESULT: $result");
+      debugPrint('REGISTER RESULT: $result');
+
+      if (result == null || result['ok'] != true) {
+        return null;
+      }
+
+      final playerRaw = result['player'];
+      if (playerRaw is! Map) {
+        return null;
+      }
+
+      final player = Map<String, dynamic>.from(playerRaw);
+
+      final serverId = player['player_id']?.toString().trim();
+      final serverName = player['player_name']?.toString().trim();
+
+      if (serverId != null && serverId.isNotEmpty && serverId != localId) {
+        debugPrint('SERVER RETURNED EXISTING PLAYER ID');
+        debugPrint('OLD LOCAL ID : $localId');
+        debugPrint('SERVER ID    : $serverId');
+
+        await setPlayerId(serverId);
+      }
+
+      if (serverName != null && serverName.isNotEmpty && serverName != name) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_playerNameKey, serverName);
+        debugPrint('SAVED SERVER PLAYER NAME LOCALLY: $serverName');
+      }
+
+      return player;
     } catch (e, s) {
-      debugPrint("REGISTER ERROR: $e");
-      debugPrint("$s");
+      debugPrint('REGISTER ERROR: $e');
+      debugPrint('$s');
+      return null;
     }
   }
 
-  static Future<void> reportWin({required bool flagWin}) async {
-    final id = await getPlayerId();
+  static Future<Map<String, dynamic>?> reportWin({
+    required bool flagWin,
+  }) async {
+    try {
+      await registerOnline();
 
-    debugPrint('REPORT WIN: $id flagWin=$flagWin');
+      final id = await getPlayerId();
+      final name = await getPlayerName();
 
-    final result = await ServerService.reportResult(
-      playerId: id,
-      result: 'win',
-      winType: flagWin ? 'flag' : 'block',
-    );
+      debugPrint('REPORT WIN: $id $name flagWin=$flagWin');
 
-    debugPrint('REPORT WIN RESULT: $result');
+      final result = await ServerService.reportResult(
+        playerId: id,
+        playerName: name,
+        result: 'win',
+        winType: flagWin ? 'flag' : 'block',
+      );
+
+      debugPrint('REPORT WIN RESULT: $result');
+
+      if (result == null || result['ok'] != true) return null;
+
+      final playerRaw = result['player'];
+      if (playerRaw is Map) {
+        return Map<String, dynamic>.from(playerRaw);
+      }
+
+      return null;
+    } catch (e, s) {
+      debugPrint('REPORT WIN ERROR: $e');
+      debugPrint('$s');
+      return null;
+    }
   }
 
-  static Future<void> reportLoss() async {
-    final id = await getPlayerId();
+  static Future<Map<String, dynamic>?> reportLoss() async {
+    try {
+      await registerOnline();
 
-    debugPrint('REPORT LOSS: $id');
+      final id = await getPlayerId();
+      final name = await getPlayerName();
 
-    final result = await ServerService.reportResult(
-      playerId: id,
-      result: 'loss',
-    );
+      debugPrint('REPORT LOSS: $id $name');
 
-    debugPrint('REPORT LOSS RESULT: $result');
+      final result = await ServerService.reportResult(
+        playerId: id,
+        playerName: name,
+        result: 'loss',
+      );
+
+      debugPrint('REPORT LOSS RESULT: $result');
+
+      if (result == null || result['ok'] != true) return null;
+
+      final playerRaw = result['player'];
+      if (playerRaw is Map) {
+        return Map<String, dynamic>.from(playerRaw);
+      }
+
+      return null;
+    } catch (e, s) {
+      debugPrint('REPORT LOSS ERROR: $e');
+      debugPrint('$s');
+      return null;
+    }
   }
 }

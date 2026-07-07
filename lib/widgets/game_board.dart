@@ -50,7 +50,8 @@ class GameBoard extends StatelessWidget {
           ),
           child: Stack(
             children: [
-              Positioned.fill(child: CustomPaint(painter: LakesPainter())),
+              if (isLake(4, 2))
+                Positioned.fill(child: CustomPaint(painter: LakesPainter())),
               GridView.builder(
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: rows * cols,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../logic/board_setup.dart';
 import '../models/game_piece.dart';
+import '../services/game_variant_service.dart';
 import 'board_screen.dart';
 import 'dart:math';
 
@@ -22,10 +23,29 @@ class _SetupScreenState extends State<SetupScreen> {
 
   GamePiece? selectedPiece;
 
+  GameVariant _variant = GameVariant.eighteenTwelve;
+  bool _variantLoaded = false;
+
   @override
   void initState() {
     super.initState();
     resetSetup();
+    _loadVariant();
+  }
+
+  Future<void> _loadVariant() async {
+    final variant = await GameVariantService.getVariant();
+
+    if (!mounted) return;
+
+    setState(() {
+      _variant = variant;
+      _variantLoaded = true;
+    });
+  }
+
+  String _pieceImage(GamePiece piece) {
+    return piece.imageForVariant(_variant);
   }
 
   void resetSetup() {
@@ -132,11 +152,49 @@ class _SetupScreenState extends State<SetupScreen> {
     return hasFlag && hasMovablePiece;
   }
 
+  Widget _pieceImageWidget(GamePiece piece) {
+    final image = _pieceImage(piece);
+
+    return Image.asset(
+      image,
+      fit: BoxFit.fill,
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint('SETUP IMAGE ERROR: $image');
+        debugPrint('$error');
+
+        return Container(
+          color: Colors.black54,
+          child: const Center(
+            child: Text(
+              'X',
+              style: TextStyle(
+                color: Colors.yellow,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!_variantLoaded) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF06420B),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF06420B),
-      appBar: AppBar(title: const Text('Manuel opstilling')),
+      appBar: AppBar(
+        title: Text(
+          '${GameVariantService.title(_variant)} - Manuel opstilling',
+        ),
+      ),
       body: Column(
         children: [
           const SizedBox(height: 4),
@@ -194,9 +252,7 @@ class _SetupScreenState extends State<SetupScreen> {
                           width: isSelectedBoardPiece ? 3 : 0.6,
                         ),
                       ),
-                      child: piece == null
-                          ? null
-                          : Image.asset(piece.image, fit: BoxFit.fill),
+                      child: piece == null ? null : _pieceImageWidget(piece),
                     ),
                   );
                 },
@@ -244,7 +300,7 @@ class _SetupScreenState extends State<SetupScreen> {
                           width: 3,
                         ),
                       ),
-                      child: Image.asset(piece.image, fit: BoxFit.fill),
+                      child: _pieceImageWidget(piece),
                     ),
                   );
                 },

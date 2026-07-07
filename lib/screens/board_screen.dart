@@ -11,6 +11,7 @@ import '../logic/move_logic.dart';
 import '../services/game_dialogs.dart';
 import '../widgets/game_board.dart';
 import '../services/player_service.dart';
+import '../services/game_variant_service.dart';
 
 class BoardScreen extends StatefulWidget {
   final List<List<GamePiece?>>? playerSetup;
@@ -24,7 +25,8 @@ class BoardScreen extends StatefulWidget {
 class _BoardScreenState extends State<BoardScreen> {
   static const int rows = 10;
   static const int cols = 10;
-
+  GameVariant _variant = GameVariant.eighteenTwelve;
+  bool _variantLoaded = false;
   bool playerTurn = true;
   bool gameOver = false;
   bool statsRecorded = false;
@@ -48,11 +50,27 @@ class _BoardScreenState extends State<BoardScreen> {
     super.initState();
     setupPieces();
     _registerPlayer();
+    _loadVariant();
+  }
+
+  Future<void> _loadVariant() async {
+    final variant = await GameVariantService.getVariant();
+
+    if (!mounted) return;
+
+    setState(() {
+      _variant = variant;
+      _variantLoaded = true;
+    });
   }
 
   bool isLake(int row, int col) {
+    if (_variant == GameVariant.eighteenTwelve) {
+      return false;
+    }
+
     return (row == 4 || row == 5) &&
-        ((col == 2 || col == 3) || (col == 6 || col == 7));
+        (col == 2 || col == 3 || col == 6 || col == 7);
   }
 
   Future<void> _registerPlayer() async {
@@ -64,9 +82,13 @@ class _BoardScreenState extends State<BoardScreen> {
 
     statsRecorded = true;
 
-    await StatsService.registerWin(flagWin: flagWin);
+    final serverPlayer = await PlayerService.reportWin(flagWin: flagWin);
 
-    await PlayerService.reportWin(flagWin: flagWin);
+    if (serverPlayer != null) {
+      await StatsService.syncFromServerPlayer(serverPlayer);
+    } else {
+      await StatsService.registerWinLocal(flagWin: flagWin);
+    }
   }
 
   Future<void> registerLossOnce() async {
@@ -74,9 +96,13 @@ class _BoardScreenState extends State<BoardScreen> {
 
     statsRecorded = true;
 
-    await StatsService.registerLoss();
+    final serverPlayer = await PlayerService.reportLoss();
 
-    await PlayerService.reportLoss();
+    if (serverPlayer != null) {
+      await StatsService.syncFromServerPlayer(serverPlayer);
+    } else {
+      await StatsService.registerLossLocal();
+    }
   }
 
   void setupPieces() {
@@ -564,7 +590,7 @@ class _BoardScreenState extends State<BoardScreen> {
             ),
             const SizedBox(height: 6),
             const Text(
-              'STRATEGO',
+              '1812',
               style: TextStyle(
                 color: Colors.red,
                 fontSize: 28,

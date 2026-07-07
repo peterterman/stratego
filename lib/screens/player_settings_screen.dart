@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../services/user_settings_service.dart';
+import '../services/game_variant_service.dart';
+import '../services/player_service.dart';
 import '../services/stats_service.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import '../services/server_service.dart';
+import '../services/user_settings_service.dart';
 
 class PlayerSettingsScreen extends StatefulWidget {
   const PlayerSettingsScreen({super.key});
@@ -16,25 +17,47 @@ class _PlayerSettingsScreenState extends State<PlayerSettingsScreen> {
 
   bool _loading = true;
   String _statusText = '';
+  GameVariant _variant = GameVariant.eighteenTwelve;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSettings() async {
+    final name = await UserSettingsService.getPlayerName();
+    final variant = await GameVariantService.getVariant();
+
+    if (!mounted) return;
+
+    setState(() {
+      _nameController.text = name ?? '';
+      _variant = variant;
+      _loading = false;
+    });
+  }
+
+  Future<void> _saveVariant(GameVariant variant) async {
+    await GameVariantService.setVariant(variant);
+
+    if (!mounted) return;
+
+    setState(() {
+      _variant = variant;
+      _statusText = 'Spiltype valgt: ${GameVariantService.title(variant)}';
+    });
+  }
 
   Future<bool> _playerNameExistsOnline(String name) async {
-    final url = Uri.parse('https://stratego.toft-terman.dk/leaderboard');
-
     try {
-      final response = await http.get(url);
-
-      if (response.statusCode != 200) {
-        return false;
-      }
-
-      final data = jsonDecode(response.body);
-
-      if (data['ok'] != true) {
-        return false;
-      }
-
-      final leaderboard = data['leaderboard'] as List;
-
+      final leaderboard = await ServerService.getLeaderboard();
       final wantedName = name.trim().toLowerCase();
 
       for (final entry in leaderboard) {
@@ -54,6 +77,51 @@ class _PlayerSettingsScreenState extends State<PlayerSettingsScreen> {
       // Ellers kan brugeren blive låst ude offline.
       return false;
     }
+  }
+
+  Future<void> _savePlayerName() async {
+    final name = _nameController.text.trim();
+
+    if (name.isEmpty) {
+      setState(() {
+        _statusText = 'Skriv et spillernavn først.';
+      });
+      return;
+    }
+
+    if (name.length < 2) {
+      setState(() {
+        _statusText = 'Spillernavn skal være mindst 2 tegn.';
+      });
+      return;
+    }
+
+    final currentName = await UserSettingsService.getPlayerName();
+
+    final isSameAsCurrent =
+        currentName != null &&
+        currentName.trim().toLowerCase() == name.toLowerCase();
+
+    if (!isSameAsCurrent) {
+      final nameExists = await _playerNameExistsOnline(name);
+
+      if (nameExists) {
+        if (!mounted) return;
+
+        setState(() {
+          _statusText = 'Navnet "$name" er allerede i brug.';
+        });
+        return;
+      }
+    }
+
+    await PlayerService.setPlayerName(name);
+
+    if (!mounted) return;
+
+    setState(() {
+      _statusText = 'Spillernavn gemt: $name';
+    });
   }
 
   Future<void> _resetLocalStats() async {
@@ -98,64 +166,52 @@ class _PlayerSettingsScreenState extends State<PlayerSettingsScreen> {
     );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _loadPlayerName();
-  }
-
-  Future<void> _loadPlayerName() async {
-    final name = await UserSettingsService.getPlayerName();
-
-    setState(() {
-      _nameController.text = name ?? '';
-      _loading = false;
-    });
-  }
-
-  Future<void> _savePlayerName() async {
-    final name = _nameController.text.trim();
-
-    if (name.isEmpty) {
-      setState(() {
-        _statusText = 'Skriv et spillernavn først.';
-      });
-      return;
-    }
-
-    if (name.length < 2) {
-      setState(() {
-        _statusText = 'Spillernavn skal være mindst 2 tegn.';
-      });
-      return;
-    }
-
-    final currentName = await UserSettingsService.getPlayerName();
-
-    final isSameAsCurrent =
-        currentName != null &&
-        currentName.trim().toLowerCase() == name.toLowerCase();
-
-    if (!isSameAsCurrent) {
-      final nameExists = await _playerNameExistsOnline(name);
-
-      if (nameExists) {
-        if (!mounted) return;
-
-        setState(() {
-          _statusText = 'Navnet "$name" er allerede i brug.';
-        });
-        return;
-      }
-    }
-
-    await UserSettingsService.setPlayerName(name);
-
-    if (!mounted) return;
-
-    setState(() {
-      _statusText = 'Spillernavn gemt: $name';
-    });
+  Widget _buildVariantSelector() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white10,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white24),
+      ),
+      child: Column(
+        children: [
+          RadioListTile<GameVariant>(
+            title: const Text(
+              '1812',
+              style: TextStyle(color: Colors.white, fontSize: 20),
+            ),
+            subtitle: const Text(
+              'Hærfører, Ingeniør, Ordonnans, Fælde og nye brikker',
+              style: TextStyle(color: Colors.white70),
+            ),
+            activeColor: Color(0xFFE0B080),
+            value: GameVariant.eighteenTwelve,
+            groupValue: _variant,
+            onChanged: (value) {
+              if (value == null) return;
+              _saveVariant(value);
+            },
+          ),
+          RadioListTile<GameVariant>(
+            title: const Text(
+              'Klassisk',
+              style: TextStyle(color: Colors.white, fontSize: 20),
+            ),
+            subtitle: const Text(
+              'Marskal, Minør, Spejder, Bombe og originale brikker',
+              style: TextStyle(color: Colors.white70),
+            ),
+            activeColor: Color(0xFFE0B080),
+            value: GameVariant.classic,
+            groupValue: _variant,
+            onChanged: (value) {
+              if (value == null) return;
+              _saveVariant(value);
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -181,6 +237,28 @@ class _PlayerSettingsScreenState extends State<PlayerSettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Text(
+                    'Spiltype',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  const Text(
+                    'Vælg om spillet skal bruge 1812-navne og brikker eller klassisk visning.',
+                    style: TextStyle(color: Colors.white70, fontSize: 16),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildVariantSelector(),
+
+                  const SizedBox(height: 36),
+
                   const Text(
                     'Spillernavn',
                     style: TextStyle(
@@ -241,6 +319,7 @@ class _PlayerSettingsScreenState extends State<PlayerSettingsScreen> {
                     style: _settingsButtonStyle(),
                     child: const Text('Nulstil lokal statistik'),
                   ),
+
                   const SizedBox(height: 20),
 
                   Text(
