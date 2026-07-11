@@ -4,6 +4,7 @@ import 'screens/leaderboard_screen.dart';
 import 'screens/player_settings_screen.dart';
 import 'screens/statistics_screen.dart';
 import 'screens/rules_screen.dart';
+import 'screens/multiplayer_screen.dart';
 import 'services/user_settings_service.dart';
 import 'services/stats_service.dart';
 import 'services/rank_service.dart';
@@ -147,6 +148,41 @@ class _FrontPageState extends State<FrontPage> {
                   ),
 
                   _menuButton(
+                    text: 'Multiplayer',
+                    onPressed: () async {
+                      var name = await UserSettingsService.getPlayerName();
+
+                      if (!context.mounted) return;
+
+                      if (name == null || name.trim().isEmpty) {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PlayerSettingsScreen(),
+                          ),
+                        );
+
+                        name = await UserSettingsService.getPlayerName();
+                        await _loadPlayerInfo();
+
+                        if (!context.mounted) return;
+                        if (name == null || name.trim().isEmpty) return;
+                      }
+
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MultiplayerScreen(
+                            playerName: name!.trim(),
+                          ),
+                        ),
+                      );
+
+                      await _loadPlayerInfo();
+                    },
+                  ),
+
+                  _menuButton(
                     text: 'Leaderboard',
                     onPressed: () {
                       Navigator.push(
@@ -202,9 +238,12 @@ class _FrontPageState extends State<FrontPage> {
                         builder: (_) => AlertDialog(
                           title: const Text('1812'),
                           content: const Text(
-                            'Version 1.0\n\n'
+                            'Version 2.0\n\n'
                             'Udviklet af Peter Terman Hansen\n\n'
-                            'Strategisk brætspil med AI-modstander.',
+                            'Strategisk brætspil, der kan spilles mod '
+                            'computer eller som multiplayer mod en anden '
+                            'spiller på en anden telefon.\n\n'
+                            'Vælg mellem 1812 og Klassisk Stratego.',
                           ),
                           actions: [
                             TextButton(

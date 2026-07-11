@@ -149,6 +149,55 @@ class PlayerService {
     }
   }
 
+  static Future<Map<String, dynamic>?> reportMultiplayerResult({
+    required String gameId,
+    required bool won,
+    String winType = '',
+  }) async {
+    try {
+      await registerOnline();
+
+      final id = await getPlayerId();
+      final name = await getPlayerName();
+
+      debugPrint(
+        'REPORT MULTIPLAYER: game=$gameId player=$id won=$won type=$winType',
+      );
+
+      final result = await ServerService.reportResult(
+        playerId: id,
+        playerName: name,
+        result: won ? 'win' : 'loss',
+        winType: won ? winType : '',
+        mode: 'multiplayer',
+        gameId: gameId,
+      );
+
+      debugPrint('REPORT MULTIPLAYER RESULT: $result');
+
+      if (result == null) {
+        throw Exception('Intet svar fra leaderboardserveren');
+      }
+
+      if (result['ok'] != true) {
+        final error = (result['error'] ?? 'Ukendt serverfejl').toString();
+        final detail = (result['detail'] ?? '').toString();
+        throw Exception(detail.isEmpty ? error : '$error: $detail');
+      }
+
+      final playerRaw = result['player'];
+      if (playerRaw is Map) {
+        return Map<String, dynamic>.from(playerRaw);
+      }
+
+      return null;
+    } catch (e, s) {
+      debugPrint('REPORT MULTIPLAYER ERROR: $e');
+      debugPrint('$s');
+      return null;
+    }
+  }
+
   static Future<Map<String, dynamic>?> reportLoss() async {
     try {
       await registerOnline();

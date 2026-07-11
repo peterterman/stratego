@@ -8,12 +8,16 @@ class BattleDialog extends StatefulWidget {
   final GamePiece attacker;
   final GamePiece defender;
   final BattleResult result;
+  final bool showOkButton;
+  final GameVariant? variant;
 
   const BattleDialog({
     super.key,
     required this.attacker,
     required this.defender,
     required this.result,
+    this.showOkButton = false,
+    this.variant,
   });
 
   @override
@@ -32,7 +36,11 @@ class _BattleDialogState extends State<BattleDialog>
   void initState() {
     super.initState();
 
-    _loadVariant();
+    if (widget.variant != null) {
+      _variant = widget.variant!;
+    } else {
+      _loadVariant();
+    }
 
     controller = AnimationController(
       vsync: this,
@@ -180,7 +188,14 @@ class _BattleDialogState extends State<BattleDialog>
           ),
         ],
       ),
-      actions: const [],
+      actions: widget.showOkButton
+          ? [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ]
+          : const [],
     );
   }
 }
